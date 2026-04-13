@@ -1,3 +1,7 @@
 venv
 model_data/*
 __pycache__
+archive/*
+.DS_Store
+mlflow.db
+mlruns/*
