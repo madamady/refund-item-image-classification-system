@@ -1,14 +1,22 @@
+import os
+import mlflow
 import mlflow.sklearn
 import pandas as pd
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List
 
+CLASS_NAMES = [
+    "T-shirt/top", "Trouser", "Pullover", "Dress", "Coat",
+    "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot"
+]
+
 app = FastAPI()
 
-# load the model from MLflow
-model = mlflow.sklearn.load_model("models:/fashion_classifier/1")  # MLflow model URI
-# models:/<model-name>/<version>
+# load the model from the local mlruns artifact path
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+mlflow.set_tracking_uri(f"sqlite:///{os.path.join(BASE_DIR, 'mlflow.db')}")
+model = mlflow.sklearn.load_model("models:/fashion_classifier/1")
 
 
 class ImageData(BaseModel):
@@ -27,8 +35,13 @@ def root():
 
 @app.post("/predict")
 def predict(data: ImageData):
-    print("Hello from predict endpoint!")
-
-    # pixels = pd.DataFrame([data.pixels])
-    # prediction = model.predict(pixels / 255.0)
-    # return {"prediction": int(prediction[0])}
+    pixels = pd.DataFrame([data.pixels])
+    normalized = pixels / 255.0
+    prediction = model.predict(normalized)
+    probabilities = model.predict_proba(normalized)[0].tolist()
+    predicted_class = int(prediction[0])
+    return {
+        "prediction": predicted_class,
+        "label": CLASS_NAMES[predicted_class],
+        "probabilities": {CLASS_NAMES[i]: round(probabilities[i], 4) for i in range(len(CLASS_NAMES))}
+    }

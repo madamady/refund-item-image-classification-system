@@ -1,8 +1,11 @@
+import os
 import pandas as pd
 import mlflow
 import mlflow.sklearn
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
+
+mlflow.set_tracking_uri(f"sqlite:///mlflow.db")
 
 # load data
 X_train = pd.read_csv("model_data/fashion-mnist_train.csv")
