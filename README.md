@@ -1,102 +1,180 @@
-Part1: Train
+# Fashion-MNIST Refund Classifier
 
-1. Use the free image data set Fashion-MNIST
-https://www.kaggle.com/datasets/zalando-research/fashionmnist/data
-2. Download and unzip, 2CSV files: fashion-mnist_train.csv and fashion-mnist_test.csv
-3. add them in model_data folder
-4. create the model: create file train.py in a model/ folder
-5. install dependencies from requirements.txt
-6. run the train script
+## Part 1: Train
 
+1. Download the [Fashion-MNIST dataset](https://www.kaggle.com/datasets/zalando-research/fashionmnist/data)
+2. Unzip and place `fashion-mnist_train.csv` and `fashion-mnist_test.csv` into `model_data/`
+3. Install dependencies:
+
+```bash
+pip install -r requirements.txt
 ```
+
+4. Run the training script:
+
+```bash
 python3 model/train.py
 ```
 
-7. opem the mlflow ui from browser: http://127.0.0.1:5000/
+The trained model is saved to `saved_model/model.pkl`.
 
+---
 
-Part 2: API
+## Part 2: API
 
-- add fast API, expose endpoints
-- run the API with:
-```
+Run the API:
+
+```bash
 uvicorn api.main:app --reload
-
 ```
 
-Part 3: Create samples and call the API
+---
 
-- create file get_sample.py
-- run the script in order to get a sample:
+## Part 3: Samples and Prediction
 
-```
-python3 get_sample.py
+Get a sample and send it to the API:
 
-```
-- take the output
-- send the output to /predict endpoint
-
-- create file  batch_process/batch.py
-
-
-
+```bash
 # Terminal 1 — start the API
 uvicorn api.main:app --reload
 
-# Terminal 2 — get a sample and send it to the API
-python3 get_sample.py | curl -s -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d @-
+# Terminal 2 — send a sample to /predict
+python3 get_sample.py | curl -s -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" -d @-
+```
 
-or
-python3 get_sample.py > /tmp/sample.json
+`get_sample.py` returns a JSON object with a `pixels` array of 784 integers (28×28 pixel values, range 0–255) representing one flattened Fashion-MNIST image.
 
-curl -s -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d @/tmp/sample.json
+---
 
+## Part 4: Docker
 
-- the get_sample.py returns a JSON object with a "pixels" array of 784 integers (28×28 pixel values, range 0–255) ( one flattened Fashion-MNIST image)
+> Make sure you have run `python3 model/train.py` first — the API container requires `saved_model/model.pkl` at build time.
 
+Start all services (API + batch + PostgreSQL):
 
+```bash
+docker-compose up --build
+```
 
-### Training
+Drop CSV files into `batch_process/upload/` — they will be processed once per day (ex: at 02:00)
 
-- the train.py file sets MLflow tracking URI to sqlite:///mlflow.db 
-- loads the data — reads the CSVs from model_data/
-- separates labels from pixels 
-- normalizes and divides all pixel values 
-- trains a RandomForestClassifier the 60k training images
-- evaluates accuracy on the 10k test images
+---
 
-MLflow:
-the model is registered under the name fashion_classifier version 1
+## Training
 
+`model/train.py`:
 
-### Batching
+- Reads CSVs from `model_data/`
+- Separates labels from pixel columns
+- Normalizes pixel values (divides by 255)
+- Trains a `RandomForestClassifier` on 60k images
+- Evaluates accuracy on 10k test images
+- Saves the model to `saved_model/model.pkl` using `joblib`
 
-batch_process/batch.py 
+When the API starts, it loads the model once into memory:
 
-- creates folders: upload/ (where new CSVs go) and prediction-results/ (where results are saved) 
-- looks in upload/ for CSV files
+```python
+model = joblib.load(os.path.join(BASE_DIR, "saved_model", "model.pkl"))
+```
 
-for each file, processes it row by row:
+---
 
-reads the CSV into a DataFrame
-drops the label column if present (as we're doing prediction, not training)
-for each row, sends a POST request to http://127.0.0.1:8000/predict with the pixel data as JSON
-collects the prediction from each response
-saves results — writes all predictions to a timestamped JSON file in prediction-results/, e.g. fashion-mnist_test_20260413_120000.json
+## Batching
 
-a) Terminal 1
+`batch_process/batch.py`:
 
+- Looks in `upload/` for CSV files
+- For each file, sends each row to `POST /predict` with the pixel data as JSON
+- Saves results to PostgreSQL (`predictions` table)
+- Runs automatically every night at 02:00 via the scheduler
+
+To test manually, add a CSV to the upload folder:
+
+```bash
+cp model_data/fashion-mnist_test.csv batch_process/upload/
+```
+
+---
+
+## Predictions Table
+
+| column | type | example |
+|---|---|---|
+| `id` | auto-increment integer | 1, 2, 3... |
+| `source_file` | text | `returns_batch_1.csv` |
+| `row_index` | integer | 0, 1, 2... |
+| `predicted_class` | integer | 9 |
+| `predicted_label` | text | `Ankle boot` |
+| `confidence` | float | 0.87 |
+| `processed_at` | timestamp | `2026-04-20 02:00:00` |
+
+---
+
+## Dataset
+
+`fashion-mnist_train.csv` contains 60,000 rows. Each row is a clothing image flattened to 784 pixel values (28×28 grayscale), plus a `label` column.
+
+| label | class |
+|---|---|
+| 0 | T-shirt/top |
+| 1 | Trouser |
+| 2 | Pullover |
+| 3 | Dress |
+| 4 | Coat |
+| 5 | Sandal |
+| 6 | Shirt |
+| 7 | Sneaker |
+| 8 | Bag |
+| 9 | Ankle boot |
+
+The dataset does not contain refund data — it is used only to train the image classifier.
+
+---
+
+## Real-world Flow
+
+1. A customer returns an item — staff photograph it
+2. The photo is converted to pixel values and saved as a CSV in `batch_process/upload/`
+3. Every night, the batch job calls `/predict` for each row
+4. Predictions are stored in the `predictions` table in PostgreSQL
+
+---
+
+## How to Run
+
+### Option A — Local
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Train the model
+python3 model/train.py
+
+# 3. Start the API
 uvicorn api.main:app --reload
 
-b) add a CSV file in the upload/ folder. example:
+# 4. Test with a sample (in a second terminal)
+python3 get_sample.py | curl -s -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" -d @-
 
-cp model_data/fashion-mnist_test.csv batch_process/upload/
-
-c) Terminal 2
-
+# 5. Run the batch manually
 python3 batch_process/batch.py
+```
 
-d) check the results 
+### Option B — Docker
 
-batch_process/prediction-results/
+```bash
+# 1. Train the model (required before building)
+python3 model/train.py
 
+# 2. Start all services — API, batch scheduler, and PostgreSQL
+docker-compose up --build
+
+# API is available at http://localhost:8000
+# Batch scheduler runs nightly at 02:00
+
+# 3. Drop CSV files into the upload folder to be processed
+cp model_data/fashion-mnist_test.csv batch_process/upload/
+```
