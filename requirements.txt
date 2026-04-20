@@ -1,5 +1,8 @@
 pandas
 scikit-learn
-mlflow
+joblib
 fastapi
 uvicorn
+requests
+psycopg2-binary
+schedule

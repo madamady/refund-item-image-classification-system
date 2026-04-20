@@ -1,6 +1,5 @@
 import os
-import mlflow
-import mlflow.sklearn
+import joblib
 import pandas as pd
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -13,10 +12,8 @@ CLASS_NAMES = [
 
 app = FastAPI()
 
-# load the model from the local mlruns artifact path
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-mlflow.set_tracking_uri(f"sqlite:///{os.path.join(BASE_DIR, 'mlflow.db')}")
-model = mlflow.sklearn.load_model("models:/fashion_classifier/1")
+model = joblib.load(os.path.join(BASE_DIR, "saved_model", "model.pkl"))
 
 
 class ImageData(BaseModel):
