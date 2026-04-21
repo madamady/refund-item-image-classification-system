@@ -2,8 +2,6 @@ import os
 import pandas as pd
 import requests
 import psycopg2
-import schedule
-import time
 from datetime import datetime
 
 UPLOAD_FOLDER = "upload"
@@ -63,9 +61,4 @@ def run_batch():
     print(f"[{datetime.now()}] Batch run complete.")
 
 
-schedule.every().day.at("02:00").do(run_batch)
-print("Batch scheduler started. Runs nightly at 02:00.")
-
-while True:
-    schedule.run_pending()
-    time.sleep(60)
+run_batch()
