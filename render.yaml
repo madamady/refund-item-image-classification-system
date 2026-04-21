@@ -23,7 +23,7 @@ services:
     startCommand: python batch_process/batch.py
     envVars:
       - key: API_URL
-        value: https://fashion-classifier-api.onrender.com/predict
+        sync: false
       - key: DB_HOST
         fromDatabase:
           name: refund-db
