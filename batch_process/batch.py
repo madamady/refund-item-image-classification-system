@@ -1,4 +1,6 @@
 import os
+import schedule
+import time
 import pandas as pd
 import requests
 import psycopg2
@@ -61,4 +63,11 @@ def run_batch():
     print(f"[{datetime.now()}] Batch run complete.")
 
 
-run_batch()
+if os.getenv("RUN_ONCE") == "true":
+    run_batch()
+else:
+    schedule.every().day.at("02:00").do(run_batch)
+    print("Batch scheduler started. Runs nightly at 02:00.")
+    while True:
+        schedule.run_pending()
+        time.sleep(60)

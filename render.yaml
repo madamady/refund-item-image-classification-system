@@ -22,6 +22,8 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python batch_process/batch.py
     envVars:
+      - key: RUN_ONCE
+        value: "true"
       - key: API_URL
         value: https://refund-item-image-classification-system.onrender.com/predict
       - key: DB_HOST
