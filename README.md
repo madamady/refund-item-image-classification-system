@@ -163,7 +163,27 @@ python3 get_sample.py | curl -s -X POST http://127.0.0.1:8000/predict \
 python3 batch_process/batch.py
 ```
 
-### Option B — Docker
+### Option B — Render (cloud deployment)
+
+The app is live at: https://refund-item-image-classification-system.onrender.com
+
+To deploy your own instance:
+
+1. Push this repo to GitHub
+2. Go to [render.com](https://render.com) → **New → Blueprint**
+3. Connect your GitHub repository — Render detects `render.yaml` and creates 3 services automatically:
+   - **fashion-classifier-api** — Web Service (FastAPI)
+   - **fashion-classifier-batch** — Cron Job (nightly at 02:00)
+   - **refund-db** — PostgreSQL database
+4. The build step trains the model automatically — no manual pre-training needed
+5. After the API deploys, copy its public URL and set the environment variable on the batch service:
+   - Go to **fashion-classifier-batch → Environment**
+   - Add `API_URL = https://<your-api-url>/predict`
+6. To trigger the batch job manually: **fashion-classifier-batch → Logs → Trigger Run**
+
+---
+
+### Option C — Docker (local)
 
 ```bash
 # 1. Train the model (required before building)
