@@ -6,8 +6,16 @@ from pydantic import BaseModel
 from typing import List
 
 CLASS_NAMES = [
-    "T-shirt/top", "Trouser", "Pullover", "Dress", "Coat",
-    "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot"
+    "T-shirt/top",
+    "Trouser",
+    "Pullover",
+    "Dress",
+    "Coat",
+    "Sandal",
+    "Shirt",
+    "Sneaker",
+    "Bag",
+    "Ankle boot",
 ]
 
 app = FastAPI()
@@ -26,7 +34,7 @@ def root():
 
 
 @app.get("/hello")
-def root():
+def hello():
     return {"message": "Hello from the fashion classifier API!"}
 
 
@@ -40,5 +48,7 @@ def predict(data: ImageData):
     return {
         "prediction": predicted_class,
         "label": CLASS_NAMES[predicted_class],
-        "probabilities": {CLASS_NAMES[i]: round(probabilities[i], 4) for i in range(len(CLASS_NAMES))}
+        "probabilities": {
+            CLASS_NAMES[i]: round(probabilities[i], 4) for i in range(len(CLASS_NAMES))
+        },
     }
