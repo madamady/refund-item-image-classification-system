@@ -1,14 +1,11 @@
 import os
-import pandas as pd
-import json
+import sys
 
-csv = (
-    "model_data/fashion-mnist_test.csv"
-    if os.path.exists("model_data/fashion-mnist_test.csv")
-    else "model_data/fashion-mnist_train_sample.csv"
-)
+img_dir = "model_data/archive (1)/images"
+images = [f for f in os.listdir(img_dir) if f.endswith(".jpg")]
+if not images:
+    print("no images found", file=sys.stderr)
+    sys.exit(1)
 
-df = pd.read_csv(csv)
-sample = df.drop("label", axis=1).iloc[0].tolist()
-
-print(json.dumps({"pixels": sample}))
+sample = os.path.join(img_dir, images[0])
+print(sample)

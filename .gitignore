@@ -1,9 +1,6 @@
 venv
-model_data/fashion-mnist_train.csv
-model_data/fashion-mnist_test.csv
-model_data/.DS_Store
+model_data
 __pycache__
-archive/*
 .DS_Store
 mlflow.db
-mlruns/*
+mlruns/

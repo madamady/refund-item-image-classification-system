@@ -1,13 +1,17 @@
 import os
+import json
 import schedule
 import time
-import pandas as pd
 import requests
 import psycopg2
 from datetime import datetime
 
+with open(os.path.join(os.path.dirname(__file__), "..", "saved_model", "classes.json")) as f:
+    CLASS_NAMES = json.load(f)
+
 UPLOAD_FOLDER = "upload"
 API_URL = os.getenv("API_URL", "http://api:8000/predict")
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
 
 def get_db():
@@ -19,46 +23,37 @@ def get_db():
     )
 
 
-def process_file(filepath, conn):
-    df = pd.read_csv(filepath)
-    if "label" in df.columns:
-        df = df.drop("label", axis=1)
-
-    filename = os.path.basename(filepath)
-    cur = conn.cursor()
-
-    for i, row in df.iterrows():
-        pixels = row.tolist()
-        response = requests.post(API_URL, json={"pixels": pixels})
-        result = response.json()
-
-        confidence = max(result["probabilities"].values())
-        cur.execute(
-            """INSERT INTO predictions
-               (source_file, row_index, predicted_class, predicted_label, confidence, processed_at)
-               VALUES (%s, %s, %s, %s, %s, %s)""",
-            (filename, i, result["prediction"], result["label"], confidence, datetime.now())
-        )
-        print(f"Row {i}: {result['label']} (confidence: {confidence:.2f})")
-
-    conn.commit()
-    cur.close()
-
-
 def run_batch():
     print(f"[{datetime.now()}] Starting batch run...")
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-    files = [f for f in os.listdir(UPLOAD_FOLDER) if f.endswith(".csv")]
+    files = [
+        f for f in os.listdir(UPLOAD_FOLDER)
+        if os.path.splitext(f)[1].lower() in IMAGE_EXTENSIONS
+    ]
     if not files:
-        print("No CSV files found in upload/")
+        print("No image files found in upload/")
         return
 
     conn = get_db()
-    for file in files:
-        print(f"Processing {file}...")
-        process_file(os.path.join(UPLOAD_FOLDER, file), conn)
-        print(f"Done with {file}")
+    cur = conn.cursor()
+
+    for filename in files:
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        with open(filepath, "rb") as img:
+            response = requests.post(API_URL, files={"file": (filename, img, "image/jpeg")})
+        result = response.json()
+        cur.execute(
+            """INSERT INTO predictions
+               (source_file, row_index, predicted_class, predicted_label, confidence, processed_at)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (filename, 0, CLASS_NAMES.index(result["label"]) if "label" in result else -1,
+             result.get("label"), result.get("confidence"), datetime.now())
+        )
+        print(f"{filename}: {result.get('label')} (confidence: {result.get('confidence', 0):.2f})")
+
+    conn.commit()
+    cur.close()
     conn.close()
     print(f"[{datetime.now()}] Batch run complete.")
 
